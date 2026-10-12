@@ -78,6 +78,8 @@ whitespace = (many (satisfy isSpace)) >> return ()
 
 data BinaryOp = Plus | Minus | Multiply | Divide
 
+data UnaryOp = Negate
+
 binaryOpToChar :: BinaryOp -> Char
 binaryOpToChar op = case op of
     Plus     -> '+'
@@ -95,11 +97,15 @@ binaryOpToFunc op = case op of
 instance Show BinaryOp where
     show op = [binaryOpToChar op]
 
-data Expr = NumberExpr Float | BinaryExpr Expr BinaryOp Expr
+data Expr =
+    NumberExpr Float |
+    BinaryExpr Expr BinaryOp Expr |
+    UnaryExpr UnaryOp Expr
 
 instance Show Expr where
     show (NumberExpr n) = show n
     show (BinaryExpr left op right) = (show left) ++ " " ++ (show op) ++ " " ++ (show right)
+    show (UnaryExpr Negate e) = "-" ++ (show e)
 
 binary :: [BinaryOp] -> Parser Expr -> Parser Expr
 binary operators rule = do
@@ -127,7 +133,10 @@ expression :: Parser Expr
 expression = binary [Plus, Minus] term
 
 term :: Parser Expr
-term = binary [Multiply, Divide] factor
+term = binary [Multiply, Divide] negation
+
+negation :: Parser Expr
+negation = whitespace >> ((char '-' >> negation >>= \n -> return (UnaryExpr Negate n)) <|> factor)
 
 factor :: Parser Expr
 factor = number <|> ((char '(') *> (whitespace) *> expression <* (whitespace) <* (char ')'))
@@ -142,6 +151,7 @@ eval (BinaryExpr e1 op e2) =
     let v2 = eval e2 in
     let func = binaryOpToFunc op in
     v1 `func` v2
+eval (UnaryExpr Negate e) = -(eval e)
 
 main :: IO ()
 main = do
