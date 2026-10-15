@@ -29,6 +29,47 @@ instance Alternative Parser where
     empty = Parser $ \_ -> Nothing
     (Parser p1) <|> (Parser p2) = Parser $ \input -> (p1 input) <|> (p2 input)
 
+data BinaryOp = Plus | Minus | Multiply | Divide
+
+data UnaryOp = Negate
+
+binaryOpToChar :: BinaryOp -> Char
+binaryOpToChar op = case op of
+    Plus     -> '+'
+    Minus    -> '-'
+    Multiply -> '*'
+    Divide   -> '/'
+
+instance Show BinaryOp where
+    show op = [binaryOpToChar op]
+
+data Expr = NumberExpr Float
+    | CharExpr Char
+    | BoolExpr Bool
+    | ListExpr [Expr]
+    | List
+    | BinaryExpr Expr BinaryOp Expr
+    | UnaryExpr UnaryOp Expr
+
+instance Show Expr where
+    show (NumberExpr n) = show n
+    show (CharExpr c) = show c
+    show (ListExpr l) = show l
+    show (BoolExpr b) = show b
+    show (BinaryExpr left op right) = (show left) ++ " " ++ (show op) ++ " " ++ (show right)
+    show (UnaryExpr Negate e) = "-" ++ (show e)
+
+data Val = NumberVal Float
+    | CharVal Char
+    | BoolVal Bool
+    | ListVal [Val]
+
+instance Show Val where
+    show (NumberVal n) = show n
+    show (CharVal c) = show c
+    show (BoolVal b) = show b
+    show (ListVal l) = show l
+
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy predicate = Parser $ \input ->
     case input of
@@ -43,8 +84,8 @@ char c = satisfy (c==)
 digit :: Parser Char
 digit = satisfy isDigit
 
-string :: String -> Parser String
-string s = mapM char s
+keyword :: String -> Parser String
+keyword s = mapM char s
 
 natural :: Parser Int
 natural = read <$> (some digit)
@@ -56,56 +97,37 @@ real = do
     fraction_part <- some digit
     return $ read (whole_part ++ "." ++ fraction_part)
 
-sepBy :: Parser a -> Parser b -> Parser [a]
-sepBy element separator = do
+sepBy1 :: Parser a -> Parser b -> Parser [a]
+sepBy1 element separator = do
     first <- element
     elements <- many (whitespace >> separator >> whitespace >> element)
     whitespace
     return (first : elements)
 
-array :: Parser [Float]
-array = do
+sepBy :: Parser a -> Parser b -> Parser [a]
+sepBy element separator = (sepBy1 element separator) <|> (return [])
+
+list :: Parser Expr
+list = do
     _ <- char '['
     whitespace
-    elements <- real `sepBy` (char ',')
+    elements <- expression `sepBy` (char ',')
     whitespace
     _ <- char ']'
     whitespace
-    return elements
+    return (ListExpr elements)
+
+char' :: Parser Expr
+char' = singleQuote *> (CharExpr <$> satisfy (\_ -> True)) <* singleQuote
+    where
+        singleQuote :: Parser ()
+        singleQuote = char '\'' >> return ()
+
+bool :: Parser Expr
+bool = BoolExpr <$> ((keyword "true" >> return True) <|> (keyword "false" >> return False))
 
 whitespace :: Parser ()
 whitespace = (many (satisfy isSpace)) >> return ()
-
-data BinaryOp = Plus | Minus | Multiply | Divide
-
-data UnaryOp = Negate
-
-binaryOpToChar :: BinaryOp -> Char
-binaryOpToChar op = case op of
-    Plus     -> '+'
-    Minus    -> '-'
-    Multiply -> '*'
-    Divide   -> '/'
-
-binaryOpToFunc :: BinaryOp -> (Float -> Float -> Float)
-binaryOpToFunc op = case op of
-    Plus     -> (+)
-    Minus    -> (-)
-    Multiply -> (*)
-    Divide   -> (/)
-
-instance Show BinaryOp where
-    show op = [binaryOpToChar op]
-
-data Expr =
-    NumberExpr Float |
-    BinaryExpr Expr BinaryOp Expr |
-    UnaryExpr UnaryOp Expr
-
-instance Show Expr where
-    show (NumberExpr n) = show n
-    show (BinaryExpr left op right) = (show left) ++ " " ++ (show op) ++ " " ++ (show right)
-    show (UnaryExpr Negate e) = "-" ++ (show e)
 
 binary :: [BinaryOp] -> Parser Expr -> Parser Expr
 binary operators rule = do
@@ -130,7 +152,14 @@ binary operators rule = do
             flipArgs f = \ a b c -> f c b a
 
 expression :: Parser Expr
-expression = binary [Plus, Minus] term
+expression =
+    arithmeticExpression
+    <|> char'
+    <|> bool
+    <|> list
+
+arithmeticExpression :: Parser Expr
+arithmeticExpression = binary [Plus, Minus] term
 
 term :: Parser Expr
 term = binary [Multiply, Divide] negation
@@ -144,19 +173,35 @@ factor = number <|> ((char '(') *> (whitespace) *> expression <* (whitespace) <*
 number :: Parser Expr
 number = NumberExpr <$> (real <|> (fromIntegral <$> natural))
 
-eval :: Expr -> Float
-eval (NumberExpr n) = n
-eval (BinaryExpr e1 op e2) = 
-    let v1 = eval e1  in
-    let v2 = eval e2 in
-    let func = binaryOpToFunc op in
-    v1 `func` v2
-eval (UnaryExpr Negate e) = -(eval e)
+eval :: Expr -> Either String Val
+eval (NumberExpr n) = return (NumberVal n)
+eval (CharExpr c) = return (CharVal c)
+eval (BoolExpr b) = return (BoolVal b)
+eval (ListExpr l) = mapM eval l >>= \l' -> return (ListVal l')
+eval (UnaryExpr Negate e) = do
+    v <- eval e
+    case v of
+        (NumberVal n) -> return (NumberVal (-n))
+        _ -> Left "Can only Negate number"
+eval (BinaryExpr e1 op e2) = do
+    v1 <- eval e1
+    v2 <- eval e2
+    case (v1, v2) of
+        (NumberVal n1, NumberVal n2) -> case op of
+            Plus     -> return (NumberVal (n1 + n2))
+            Minus    -> return (NumberVal (n1 - n2))
+            Multiply -> return (NumberVal (n1 * n2))
+            Divide   -> if n2 == 0 then Left "Cannot divide by 0" else return (NumberVal (n1 / n2))
+        _ -> Left "Both opperands must be numbers"
 
 main :: IO ()
 main = do
     input <- getLine
     let ast = run_parser expression input
     let val = ast >>= \(expr, _) -> return (eval expr)
-    print val
+    case val of
+        Nothing  -> print "Parse Error"
+        (Just v) -> case v of
+            (Left err) -> print err
+            (Right v') -> print v'
     main
