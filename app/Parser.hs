@@ -35,12 +35,6 @@ instance Alternative Parser where
             then Left (err, rest)
             else (p2 input)
 
-try :: Parser a -> Parser a
-try (Parser p) = Parser $ \input ->
-    case p input of
-        Right a       -> Right a
-        Left (err, _) -> Left(err, input)
-
 satisfy :: (Char -> Bool) -> Parser Char
 satisfy predicate = Parser $ \input ->
     case input of
@@ -56,6 +50,18 @@ char charToMatch = Parser $ \input ->
         (c:cs) -> if charToMatch == c
                     then Right (c, cs)
                     else Left ("Expected " ++ [charToMatch] ++ " but got " ++ [c], input)
+
+whitespace :: Parser ()
+whitespace = (many (satisfy isSpace)) >> return ()
+
+consume :: Char -> Parser ()
+consume c = (char c) >> whitespace
+
+try :: Parser a -> Parser a
+try (Parser p) = Parser $ \input ->
+    case p input of
+        Right a       -> Right a
+        Left (err, _) -> Left(err, input)
 
 (<?>) :: Parser a -> String -> Parser a
 (Parser p) <?> message = Parser $ \input ->
@@ -80,7 +86,7 @@ natural = read <$> (some digit)
 real :: Parser Float
 real = do
     whole_part <- some digit
-    _ <- char '.'
+    consume '.'
     fraction_part <- some digit
     return $ read (whole_part ++ "." ++ fraction_part)
 
@@ -96,65 +102,55 @@ sepBy element separator =  (element `sepBy1` separator) <|> (return [])
 
 list :: Parser Expr
 list = do
-    _ <- char '['
-    whitespace
+    consume '['
     elements <- expression `sepBy` (char ',')
     whitespace
-    _ <- char ']'
-    whitespace
+    consume ']'
     return (ListExpr elements)
 
 range :: Parser Expr
 range = do
-    _ <- char '['
-    whitespace
+    consume '['
     start <- expression
     whitespace
-    _ <- char '.'
-    _ <- char '.'
-    whitespace
+    consume '.'
+    consume '.'
     end <- expression
     whitespace
-    _ <- char ']'
-    whitespace
+    consume ']'
     return (RangeExpr start end)
 
 listComprehension :: Parser Expr
 listComprehension = do
-    _ <- char '['
-    whitespace
+    consume '['
     output <- expression
-    _ <- char '|'
-    whitespace
+    consume '|'
     element <- name
-    _ <- char '<'
-    _ <- char '-'
-    whitespace
+    consume '<'
+    consume '-'
     source <- expression
     whitespace
-    _ <- char ']'
-    whitespace
+    consume ']'
     return (ListComprehensionExpr output element source)
 
-
 char' :: Parser Expr
-char' = singleQuote *> (CharExpr <$> satisfy (\_ -> True)) <* singleQuote
-    where
-        singleQuote :: Parser ()
-        singleQuote = char '\'' >> return ()
+char' = do
+    consume '\''
+    c <- satisfy (\_ -> True)
+    consume '\''
+    return (CharExpr c)
 
 string :: Parser Expr
 string = do
-    _        <- char '"'
+    consume '"'
     contents <- many (satisfy (/='"'))
-    _        <- char '"'
+    consume '"'
     return (StringExpr contents)
 
 bool :: Parser Expr
-bool = BoolExpr <$> ((keyword "true" >> return True) <|> (keyword "false" >> return False))
-
-whitespace :: Parser ()
-whitespace = (many (satisfy isSpace)) >> return ()
+bool = do
+    b <- ((keyword "true" >> return True) <|> (keyword "false" >> return False))
+    return (BoolExpr b)
 
 binary :: [BinaryOp] -> Parser Expr -> Parser Expr
 binary operators rule = do
@@ -178,6 +174,24 @@ binary operators rule = do
             flipArgs :: (a -> b -> c -> d) -> (c -> b -> a -> d)
             flipArgs f = \ a b c -> f c b a
 
+arithmeticExpression :: Parser Expr
+arithmeticExpression = binary [Plus, Minus] term
+
+term :: Parser Expr
+term = binary [Multiply, Divide] negation
+
+negation :: Parser Expr
+negation = (char '-' >> negation >>= \n -> return (UnaryExpr Negate n)) <|> factor
+
+factor :: Parser Expr
+factor = number <|> name' <|> ((consume '(') *> expression <* (consume ')'))
+
+number :: Parser Expr
+number = do
+    n <- (try real) <|> (fromIntegral <$> natural)
+    whitespace
+    return (NumberExpr n)
+
 ternary :: Parser Expr
 ternary = do
     keyword "if"
@@ -186,6 +200,7 @@ ternary = do
     thenBranch <- expression
     keyword "else"
     elseBranch <- expression
+    whitespace
     return (TernaryExpr condition thenBranch elseBranch)
 
 name :: Parser String
@@ -223,18 +238,3 @@ program = expression <* eof
         eof = Parser $ \input -> if (length input) == 0
             then Right ((), "")
             else Left ("Expected EOF", input)
-
-arithmeticExpression :: Parser Expr
-arithmeticExpression = binary [Plus, Minus] term
-
-term :: Parser Expr
-term = binary [Multiply, Divide] negation
-
-negation :: Parser Expr
-negation = whitespace >> ((char '-' >> negation >>= \n -> return (UnaryExpr Negate n)) <|> factor)
-
-factor :: Parser Expr
-factor = number <|> name' <|> ((char '(') *> (whitespace) *> expression <* (whitespace) <* (char ')'))
-
-number :: Parser Expr
-number = NumberExpr <$> ((try real) <|> (fromIntegral <$> natural))
