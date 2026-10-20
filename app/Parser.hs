@@ -205,10 +205,9 @@ name' :: Parser Expr
 name' = NameExpr <$> (name)
 
 expression :: Parser Expr
-expression =
-    arithmeticExpression
-    <|> char'
+expression = char'
     <|> bool
+    <|> arithmeticExpression
     <|> (try range)
     <|> (try listComprehension)
     <|> list
