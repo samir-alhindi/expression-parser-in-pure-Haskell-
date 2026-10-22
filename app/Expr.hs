@@ -18,7 +18,7 @@ data Expr =
     | CallExpr Expr [Expr]
 
 data BinaryOp = Plus
-    | Minus | Multiply | Divide
+    | Minus | Multiply | Divide | Mod
     | LessThan | GreaterThan | IsEqual | NotEqual | LessThanOrEqual | GreaterThanOrEqual
     | And | Or
 
@@ -30,6 +30,7 @@ instance Show BinaryOp where
         Minus    -> "-"
         Multiply -> "*"
         Divide   -> "/"
+        Mod      -> "%"
 
         LessThan -> "<"
         GreaterThan -> ">"

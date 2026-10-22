@@ -188,7 +188,7 @@ arithmatic :: Parser Expr
 arithmatic = binary [Plus, Minus] term
 
 term :: Parser Expr
-term = binary [Multiply, Divide] negation
+term = binary [Multiply, Divide, Mod] negation
 
 negation :: Parser Expr
 negation = (do

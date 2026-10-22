@@ -1,5 +1,7 @@
 module Evaluator where
 
+import Data.Fixed (mod')
+
 import Expr
 import Val
 import Environment(Environment)
@@ -32,6 +34,7 @@ eval envi (BinaryExpr e1 op e2) = do
             Minus       -> return (NumberVal (n1 - n2))
             Multiply    -> return (NumberVal (n1 * n2))
             Divide      -> if n2 == 0 then Left "Cannot divide by 0" else return (NumberVal (n1 / n2))
+            Mod         -> if n2 == 0 then Left "Cannot divide by 0" else return (NumberVal (n1 `mod'` n2))
             LessThan    -> return (BoolVal (n1 < n2))
             GreaterThan -> return (BoolVal (n1 > n2))
             GreaterThanOrEqual -> return (BoolVal (n1 >= n2))
