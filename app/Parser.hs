@@ -167,19 +167,35 @@ binary operators rule = do
                 return (flipped right op)
 
             operators_parser :: Parser BinaryOp
-            operators_parser = foldl (\parser op -> parser <|> (op <$ (char (binaryOpToChar op)))) empty operators
+            operators_parser = foldl (\parser op -> parser <|> (op <$ (word (show op)))) empty operators
 
             flipArgs :: (a -> b -> c -> d) -> (c -> b -> a -> d)
             flipArgs f = \ a b c -> f c b a
 
 expression :: Parser Expr
-expression = binary [Plus, Minus] term
+expression = or'
+
+or' :: Parser Expr
+or' = binary [Or] and'
+
+and' :: Parser Expr
+and' = binary [And] relational
+
+relational :: Parser Expr
+relational = binary [LessThan, GreaterThan, LessThanOrEqual, GreaterThanOrEqual, IsEqual, NotEqual] arithmatic
+
+arithmatic :: Parser Expr
+arithmatic = binary [Plus, Minus] term
 
 term :: Parser Expr
 term = binary [Multiply, Divide] negation
 
 negation :: Parser Expr
-negation = (consume '-' >> negation >>= \n -> return (UnaryExpr Negate n)) <|> factor
+negation = (do
+    op       <- (word "not" >> return Not) <|> (word "-" >> return Negate)
+    whitespace
+    opperand <- negation
+    return (UnaryExpr op opperand)) <|> factor
 
 factor :: Parser Expr
 factor = ((consume '(') *> expression <* (consume ')')) <|> atom

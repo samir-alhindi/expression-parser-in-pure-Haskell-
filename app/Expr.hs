@@ -17,12 +17,34 @@ data Expr =
     | LambdaExpr Expr [String]
     | CallExpr Expr [Expr]
 
-data BinaryOp = Plus | Minus | Multiply | Divide
+data BinaryOp = Plus
+    | Minus | Multiply | Divide
+    | LessThan | GreaterThan | IsEqual | NotEqual | LessThanOrEqual | GreaterThanOrEqual
+    | And | Or
 
-data UnaryOp = Negate
+data UnaryOp = Negate | Not
 
 instance Show BinaryOp where
-    show op = [binaryOpToChar op]
+    show op = case op of
+        Plus     -> "+"
+        Minus    -> "-"
+        Multiply -> "*"
+        Divide   -> "/"
+
+        LessThan -> "<"
+        GreaterThan -> ">"
+        IsEqual -> "=="
+        NotEqual -> "!="
+        LessThanOrEqual -> "<="
+        GreaterThanOrEqual -> ">="
+
+        And -> "and"
+        Or -> "or"
+
+instance Show UnaryOp where
+    show op = case op of
+        Negate -> "-"
+        Not -> "not"
 
 instance Show Expr where
     show (NumberExpr n) = show n
@@ -32,16 +54,9 @@ instance Show Expr where
     show (BoolExpr b) = show b
     show (NameExpr name) = name
     show (BinaryExpr left op right) = (show left) ++ " " ++ (show op) ++ " " ++ (show right)
-    show (UnaryExpr Negate e) = "-" ++ (show e)
+    show (UnaryExpr op e) = (show op) ++ (show e)
     show (TernaryExpr condition thenBranch elseBranch) = intercalate ", " (map show  [condition, thenBranch, elseBranch])
     show (RangeExpr start end) = "[" ++ (show start) ++ ".." ++ (show end) ++ "]"
     show (CallExpr callee args) = (show callee) ++ "(" ++ (intercalate ", " (map show args)) ++ ")"
     show (LambdaExpr _ parameters) = "lambda" ++ "(" ++ (intercalate ", " parameters) ++ ")"
-
-binaryOpToChar :: BinaryOp -> Char
-binaryOpToChar op = case op of
-    Plus     -> '+'
-    Minus    -> '-'
-    Multiply -> '*'
-    Divide   -> '/'
-
+    show (ListComprehensionExpr _ _ _) = "ListComprehensionExpr"

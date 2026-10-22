@@ -14,21 +14,34 @@ eval envi (NameExpr name) = case Environment.get envi name of
     Nothing  -> Left ("Name '" ++ name ++ "' is not defined.")
 eval envi (ListExpr l) = mapM (eval envi) l >>= \l' -> return (ListVal l')
 eval _ (StringExpr s) = return (StringVal s)
-eval envi (UnaryExpr Negate e) = do
+eval envi (UnaryExpr op e) = do
     v <- eval envi e
-    case v of
-        (NumberVal n) -> return (NumberVal (-n))
-        _ -> Left "Can only Negate number"
+    case op of
+        Negate -> case v of
+            NumberVal n -> return (NumberVal (-n))
+            _ -> Left ("'-' operand must be a number")
+        Not -> case v of
+            BoolVal b -> return (BoolVal (not b))
+            _ -> Left ("'not' operand must be a boolean")
 eval envi (BinaryExpr e1 op e2) = do
     v1 <- eval envi e1
     v2 <- eval envi e2
     case (v1, v2) of
         (NumberVal n1, NumberVal n2) -> case op of
-            Plus     -> return (NumberVal (n1 + n2))
-            Minus    -> return (NumberVal (n1 - n2))
-            Multiply -> return (NumberVal (n1 * n2))
-            Divide   -> if n2 == 0 then Left "Cannot divide by 0" else return (NumberVal (n1 / n2))
-        _ -> Left "Both opperands must be numbers"
+            Plus        -> return (NumberVal (n1 + n2))
+            Minus       -> return (NumberVal (n1 - n2))
+            Multiply    -> return (NumberVal (n1 * n2))
+            Divide      -> if n2 == 0 then Left "Cannot divide by 0" else return (NumberVal (n1 / n2))
+            LessThan    -> return (BoolVal (n1 < n2))
+            GreaterThan -> return (BoolVal (n1 > n2))
+            GreaterThanOrEqual -> return (BoolVal (n1 >= n2))
+            LessThanOrEqual -> return (BoolVal (n1 <= n2))
+            IsEqual -> return (BoolVal (n1 == n2))
+            NotEqual -> return (BoolVal (n1 /= n2))
+        (BoolVal b1, BoolVal b2) -> case op of
+            And -> return (BoolVal (b1 && b2))
+            Or -> return (BoolVal (b1 || b2))
+        _ -> Left ("Invalid opperands")
 eval envi (TernaryExpr condition thenBranch elseBranch) = do
     conditionVal <- eval envi condition
     case conditionVal of
