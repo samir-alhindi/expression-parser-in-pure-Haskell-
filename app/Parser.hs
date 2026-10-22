@@ -64,12 +64,12 @@ try (Parser p) = Parser $ \input ->
         Left (err, _) -> Left(err, input)
 
 (<?>) :: Parser a -> String -> Parser a
-(Parser p) <?> message = Parser $ \input ->
+(Parser p) <?> hint = Parser $ \input ->
     case p input of
         Right a          -> Right a
         Left (err, rest) -> if (length rest) < (length input)
             then Left (err, rest)
-            else Left (message, input)
+            else Left ("Expected " ++ hint, input)
 
 digit :: Parser Char
 digit = satisfy isDigit
@@ -78,7 +78,7 @@ word :: String -> Parser String
 word s = mapM char s
 
 keyword :: String -> Parser ()
-keyword s = (word s >> whitespace) <?> ("Expected keyword " ++ s)
+keyword s = (word s >> whitespace) <?> ("keyword " ++ s)
 
 natural :: Parser Int
 natural = read <$> (some digit)
@@ -88,7 +88,8 @@ real = do
     whole_part <- some digit
     consume '.'
     fraction_part <- some digit
-    return $ read (whole_part ++ "." ++ fraction_part)
+    whitespace
+    return (read (whole_part ++ "." ++ fraction_part))
 
 sepBy1 :: Parser a -> Parser b -> Parser [a]
 sepBy1 element separator = do
@@ -112,11 +113,9 @@ range :: Parser Expr
 range = do
     consume '['
     start <- expression
-    whitespace
     consume '.'
     consume '.'
     end <- expression
-    whitespace
     consume ']'
     return (RangeExpr start end)
 
@@ -129,7 +128,6 @@ listComprehension = do
     consume '<'
     consume '-'
     source <- expression
-    whitespace
     consume ']'
     return (ListComprehensionExpr output element source)
 
@@ -174,17 +172,17 @@ binary operators rule = do
             flipArgs :: (a -> b -> c -> d) -> (c -> b -> a -> d)
             flipArgs f = \ a b c -> f c b a
 
-arithmeticExpression :: Parser Expr
-arithmeticExpression = binary [Plus, Minus] term
+expression :: Parser Expr
+expression = binary [Plus, Minus] term
 
 term :: Parser Expr
 term = binary [Multiply, Divide] negation
 
 negation :: Parser Expr
-negation = (char '-' >> negation >>= \n -> return (UnaryExpr Negate n)) <|> factor
+negation = (consume '-' >> negation >>= \n -> return (UnaryExpr Negate n)) <|> factor
 
 factor :: Parser Expr
-factor = number <|> name' <|> ((consume '(') *> expression <* (consume ')'))
+factor = ((consume '(') *> expression <* (consume ')')) <|> atom
 
 number :: Parser Expr
 number = do
@@ -200,7 +198,6 @@ ternary = do
     thenBranch <- expression
     keyword "else"
     elseBranch <- expression
-    whitespace
     return (TernaryExpr condition thenBranch elseBranch)
 
 name :: Parser String
@@ -219,17 +216,17 @@ name = do
 name' :: Parser Expr
 name' = NameExpr <$> (name)
 
-expression :: Parser Expr
-expression = char'
+atom :: Parser Expr
+atom = number
+    <|> char'
     <|> bool
-    <|> arithmeticExpression
     <|> (try range)
     <|> (try listComprehension)
     <|> list
     <|> string
     <|> ternary
     <|> name'
-    <?> "Expceted Expression"
+    <?> "atomic expression"
 
 program :: Parser Expr
 program = expression <* eof

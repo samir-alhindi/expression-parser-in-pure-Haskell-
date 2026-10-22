@@ -10,10 +10,10 @@ eval _ (NumberExpr n) = return (NumberVal n)
 eval _ (CharExpr c) = return (CharVal c)
 eval _ (BoolExpr b) = return (BoolVal b)
 eval envi (NameExpr name) = case Environment.get envi name of
-    Just val -> Right val
+    Just val -> return val
     Nothing  -> Left ("Name '" ++ name ++ "' is not defined.")
 eval envi (ListExpr l) = mapM (eval envi) l >>= \l' -> return (ListVal l')
-eval _ (StringExpr s) = Right (ListVal (map CharVal s))
+eval _ (StringExpr s) = return (StringVal s)
 eval envi (UnaryExpr Negate e) = do
     v <- eval envi e
     case v of
