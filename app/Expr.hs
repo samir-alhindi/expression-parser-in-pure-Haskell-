@@ -16,6 +16,7 @@ data Expr =
     | UnaryExpr UnaryOp Expr
     | LambdaExpr Expr [String]
     | CallExpr Expr [Expr]
+    | SubscriptExpr Expr Expr
 
 data BinaryOp = Plus
     | Minus | Multiply | Divide | Mod

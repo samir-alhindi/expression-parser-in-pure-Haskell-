@@ -192,10 +192,22 @@ term = binary [Multiply, Divide, Mod] negation
 
 negation :: Parser Expr
 negation = (do
-    op       <- (word "not" >> return Not) <|> (word "-" >> return Negate)
-    whitespace
+    op       <- (keyword "not" >> return Not) <|> (keyword "-" >> return Negate)
     opperand <- negation
-    return (UnaryExpr op opperand)) <|> factor
+    return (UnaryExpr op opperand)) <|> postfix
+
+postfix :: Parser Expr
+postfix = do
+    left   <- factor
+    functions <- many subscript
+    return (foldl (flip ($)) left functions)
+        where
+            subscript :: Parser (Expr -> Expr)
+            subscript = do
+                consume '['
+                index <- expression
+                consume ']'
+                return ((flip SubscriptExpr) index)
 
 factor :: Parser Expr
 factor = ((consume '(') *> expression <* (consume ')')) <|> atom

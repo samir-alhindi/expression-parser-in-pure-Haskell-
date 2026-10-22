@@ -75,3 +75,16 @@ eval envi (ListComprehensionExpr outputExpr elementName sourceExpr) = do
             return (ListVal outputList)
         _ ->
             Left ("List comprehension source must evaluate to a list")
+eval envi (SubscriptExpr sourceExpr indexExpr) = do
+    sourceVal <- eval envi sourceExpr
+    case sourceVal of
+        (ListVal l) -> do
+            indexVal <- eval envi indexExpr
+            case indexVal of
+                (NumberVal n) -> case properFraction n :: (Int, Float) of
+                    (index, 0.0) -> if index < length l
+                        then return (l !! index)
+                        else Left (show index ++ " is out of bounds")
+                    _          -> Left ("index must be whole number")
+                _             -> Left ("index must be a number")
+        _           -> Left ("can only subscript a list")

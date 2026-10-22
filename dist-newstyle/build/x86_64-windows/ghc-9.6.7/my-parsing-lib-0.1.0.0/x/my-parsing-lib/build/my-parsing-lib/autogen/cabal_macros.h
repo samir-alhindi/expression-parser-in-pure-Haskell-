@@ -30,16 +30,6 @@
   (major1) == 0 && (major2) <  6 || \
   (major1) == 0 && (major2) == 6 && (minor) <= 7)
 #endif /* MIN_VERSION_containers */
-/* package data-fix-0.3.4 */
-#ifndef VERSION_data_fix
-#define VERSION_data_fix "0.3.4"
-#endif /* VERSION_data_fix */
-#ifndef MIN_VERSION_data_fix
-#define MIN_VERSION_data_fix(major1,major2,minor) (\
-  (major1) <  0 || \
-  (major1) == 0 && (major2) <  3 || \
-  (major1) == 0 && (major2) == 3 && (minor) <= 4)
-#endif /* MIN_VERSION_data_fix */
 
 /* tool gcc-14.0.6 */
 #ifndef TOOL_VERSION_gcc
