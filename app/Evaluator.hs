@@ -28,23 +28,34 @@ eval envi (UnaryExpr op e) = do
 eval envi (BinaryExpr e1 op e2) = do
     v1 <- eval envi e1
     v2 <- eval envi e2
-    case (v1, v2) of
-        (NumberVal n1, NumberVal n2) -> case op of
-            Plus        -> return (NumberVal (n1 + n2))
-            Minus       -> return (NumberVal (n1 - n2))
-            Multiply    -> return (NumberVal (n1 * n2))
-            Divide      -> if n2 == 0 then Left "Cannot divide by 0" else return (NumberVal (n1 / n2))
-            Mod         -> if n2 == 0 then Left "Cannot divide by 0" else return (NumberVal (n1 `mod'` n2))
-            LessThan    -> return (BoolVal (n1 < n2))
-            GreaterThan -> return (BoolVal (n1 > n2))
-            GreaterThanOrEqual -> return (BoolVal (n1 >= n2))
-            LessThanOrEqual -> return (BoolVal (n1 <= n2))
-            IsEqual -> return (BoolVal (n1 == n2))
-            NotEqual -> return (BoolVal (n1 /= n2))
-        (BoolVal b1, BoolVal b2) -> case op of
-            And -> return (BoolVal (b1 && b2))
-            Or -> return (BoolVal (b1 || b2))
-        _ -> Left ("Invalid opperands")
+    case op of
+            IsEqual  -> return (BoolVal (v1 == v2))
+            NotEqual -> return (BoolVal (v1 /= v2))
+            o | o `elem` [And, Or] -> do
+                (b1, b2) <- checkBoolOpperands v1 v2
+                case o of
+                    And -> return (BoolVal (b1 && b2))
+                    Or  -> return (BoolVal (b1 || b2))
+                    _        -> Left ("Unhandled case")
+                |  otherwise -> do
+                    (n1, n2) <- checkNumberOpperands v1 v2
+                    if o `elem` [Divide, Mod]
+                        then if n2 == 0
+                            then Left "Cannot divide by 0"
+                            else case o of
+                                Divide -> return (NumberVal (n1 / n2))
+                                Mod    -> return (NumberVal (n1 `mod'` n2))
+                                _      -> Left ("Unhandled case")
+                        else case o of
+                            Plus        -> return (NumberVal (n1 + n2))
+                            Minus       -> return (NumberVal (n1 - n2))
+                            Multiply    -> return (NumberVal (n1 * n2))
+                            LessThan    -> return (BoolVal (n1 < n2))
+                            GreaterThan -> return (BoolVal (n1 > n2))
+                            GreaterThanOrEqual -> return (BoolVal (n1 >= n2))
+                            LessThanOrEqual    -> return (BoolVal (n1 <= n2))
+                            _        -> Left ("Unhandled case")
+
 eval envi (TernaryExpr condition thenBranch elseBranch) = do
     conditionVal <- eval envi condition
     case conditionVal of
@@ -66,13 +77,18 @@ eval envi (CallExpr calleeExpr argsExpr) = do
             let newEnvi = Environment.extend closure (zip parameters argsVal)
             eval newEnvi bodyExpr
         _ -> Left ("can only call lambdas")
-eval envi (ListComprehensionExpr outputExpr elementName sourceExpr) = do
+eval envi (ListComprehensionExpr outputExpr elementName sourceExpr gaurdExpr) = do
     sourceVal <- eval envi sourceExpr
     case sourceVal of
-        (ListVal l) -> do
-            let environments = map (\x -> Environment.extend envi [(elementName, x)]) l
-            outputList <- mapM ((flip eval) outputExpr) environments
-            return (ListVal outputList)
+        (ListVal values) -> do
+            let environments = map (\x -> Environment.extend envi [(elementName, x)]) values
+            mappedValues <- mapM ((flip eval) outputExpr) environments
+            gaurdValues  <- mapM ((flip eval) gaurdExpr)  environments
+            bitmask      <- mapM (\v -> case v of
+                BoolVal b -> Right b
+                _         -> Left "gaurd must eval to boolean") gaurdValues
+            let filteredValues = [v | (True, v) <- zip bitmask mappedValues]
+            return (ListVal filteredValues)
         _ ->
             Left ("List comprehension source must evaluate to a list")
 eval envi (SubscriptExpr sourceExpr indexExpr) = do
@@ -85,6 +101,14 @@ eval envi (SubscriptExpr sourceExpr indexExpr) = do
                     (index, 0.0) -> if index < length l
                         then return (l !! index)
                         else Left (show index ++ " is out of bounds")
-                    _          -> Left ("index must be whole number")
-                _             -> Left ("index must be a number")
-        _           -> Left ("can only subscript a list")
+                    _ -> Left ("index must be whole number")
+                _ -> Left ("index must be a number")
+        _ -> Left ("can only subscript a list")
+
+checkBoolOpperands :: Val -> Val -> Either String (Bool, Bool)
+checkBoolOpperands (BoolVal b1) (BoolVal b2) = return (b1, b2)
+checkBoolOpperands _ _ = Left ("Opperands must both be booleans")
+
+checkNumberOpperands :: Val -> Val -> Either String (Float, Float)
+checkNumberOpperands (NumberVal n1) (NumberVal n2) = return (n1, n2)
+checkNumberOpperands _ _ = Left ("Opperands must both be numbers")

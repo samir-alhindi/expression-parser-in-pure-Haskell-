@@ -19,3 +19,10 @@ instance Show Val where
     show (ListVal l) = show l
     show (StringVal s) = s
     show (LambdaVal _ _ _) = "lambda"
+
+instance Eq Val where
+    (NumberVal n1) == (NumberVal n2) = n1 == n2
+    (CharVal c1)   == (CharVal c2)   = c1 == c2
+    (BoolVal b1)   == (BoolVal b2)   = b1 == b2
+    (ListVal l1)   == (ListVal l2)   = l1 == l2
+    _ == _                         = False 

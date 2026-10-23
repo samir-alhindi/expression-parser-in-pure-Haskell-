@@ -17,6 +17,5 @@ extend :: Environment a -> [(String, a)] -> Environment a
 extend (Global table) keyValuePairs = Environment (Map.fromList keyValuePairs) (Global table)
 extend (Environment table outer) keyValuePairs = Environment (Map.fromList keyValuePairs) (Environment table outer)
 
-
-globalEnvironment :: (Environment a)
+globalEnvironment :: Environment a
 globalEnvironment = Global Map.empty

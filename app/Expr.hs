@@ -8,7 +8,7 @@ data Expr =
     | BoolExpr Bool
     | NameExpr String
     | ListExpr [Expr]
-    | ListComprehensionExpr Expr String Expr
+    | ListComprehensionExpr Expr String Expr Expr
     | RangeExpr Expr Expr
     | StringExpr String
     | TernaryExpr Expr Expr Expr
@@ -21,7 +21,7 @@ data Expr =
 data BinaryOp = Plus
     | Minus | Multiply | Divide | Mod
     | LessThan | GreaterThan | IsEqual | NotEqual | LessThanOrEqual | GreaterThanOrEqual
-    | And | Or
+    | And | Or deriving Eq
 
 data UnaryOp = Negate | Not
 
@@ -61,4 +61,4 @@ instance Show Expr where
     show (RangeExpr start end) = "[" ++ (show start) ++ ".." ++ (show end) ++ "]"
     show (CallExpr callee args) = (show callee) ++ "(" ++ (intercalate ", " (map show args)) ++ ")"
     show (LambdaExpr _ parameters) = "lambda" ++ "(" ++ (intercalate ", " parameters) ++ ")"
-    show (ListComprehensionExpr _ _ _) = "ListComprehensionExpr"
+    show (ListComprehensionExpr _ _ _ _) = "ListComprehensionExpr"

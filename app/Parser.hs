@@ -128,8 +128,9 @@ listComprehension = do
     consume '<'
     consume '-'
     source <- expression
+    guard  <- (consume ',' >> expression) <|> (return (BoolExpr True))
     consume ']'
-    return (ListComprehensionExpr output element source)
+    return (ListComprehensionExpr output element source guard)
 
 char' :: Parser Expr
 char' = do
@@ -199,7 +200,7 @@ negation = (do
 postfix :: Parser Expr
 postfix = do
     left   <- factor
-    functions <- many subscript
+    functions <- many (subscript <|> call)
     return (foldl (flip ($)) left functions)
         where
             subscript :: Parser (Expr -> Expr)
@@ -208,6 +209,13 @@ postfix = do
                 index <- expression
                 consume ']'
                 return ((flip SubscriptExpr) index)
+            
+            call :: Parser (Expr -> Expr)
+            call = do
+                consume '('
+                args <- expression `sepBy` (consume ',')
+                consume ')'
+                return ((flip CallExpr) args)
 
 factor :: Parser Expr
 factor = ((consume '(') *> expression <* (consume ')')) <|> atom
@@ -227,6 +235,14 @@ ternary = do
     keyword "else"
     elseBranch <- expression
     return (TernaryExpr condition thenBranch elseBranch)
+
+lambda :: Parser Expr
+lambda = do
+    consume '\\'
+    parameters <- name `sepBy` whitespace
+    consume '.'
+    body <- expression
+    return (LambdaExpr body parameters)
 
 name :: Parser String
 name = do
@@ -253,6 +269,7 @@ atom = number
     <|> list
     <|> string
     <|> ternary
+    <|> lambda
     <|> name'
     <?> "atomic expression"
 
