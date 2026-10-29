@@ -78,7 +78,7 @@ word :: String -> Parser String
 word s = mapM char s
 
 keyword :: String -> Parser ()
-keyword s = (word s >> whitespace) <?> ("keyword " ++ s)
+keyword s = (try (word s >> whitespace)) <?> ("keyword " ++ s)
 
 natural :: Parser Int
 natural = read <$> (some digit)
@@ -168,7 +168,7 @@ binary operators rule = do
                 return (flipped right op)
 
             operators_parser :: Parser BinaryOp
-            operators_parser = foldl (\parser op -> parser <|> (op <$ (word (show op)))) empty operators
+            operators_parser = foldl (\parser op -> parser <|> (op <$ (keyword (show op)))) empty operators
 
             flipArgs :: (a -> b -> c -> d) -> (c -> b -> a -> d)
             flipArgs f = \ a b c -> f c b a

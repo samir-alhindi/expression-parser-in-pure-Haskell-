@@ -2,7 +2,7 @@ module Val where
 
 import Expr
 import Environment (Environment)
-
+import Data.List (isSuffixOf)
 
 data Val =
     NumberVal Float
@@ -13,7 +13,11 @@ data Val =
     | LambdaVal Expr [String] (Environment Val)
 
 instance Show Val where
-    show (NumberVal n) = show n
+    show (NumberVal n) =
+        let s = show n in
+            if ".0" `isSuffixOf` s
+                then init (init s)
+                else s
     show (CharVal c) = show c
     show (BoolVal b) = show b
     show (ListVal l) = show l
