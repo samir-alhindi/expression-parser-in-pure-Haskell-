@@ -6,18 +6,17 @@ import Control.Monad.Reader
 
 import Expr
 import Val
-import Environment(Environment)
-import qualified Environment
+import Environment
 
-type Eval = ReaderT (Environment Val) (Either String) Val
+type Eval a = ReaderT (Environment Val) (Either String) a
 
-eval :: Expr -> Eval
+eval :: Expr -> Eval Val
 eval (NumberExpr n) = return (NumberVal n)
 eval (CharExpr c) = return (CharVal c)
 eval (BoolExpr b) = return (BoolVal b)
 eval (NameExpr name) = do
     envi <- ask
-    case Environment.get envi name of
+    case find envi name of
         Just val -> return val
         Nothing  -> throwError ("Name '" ++ name ++ "' is not defined.")
 eval (ListExpr es) = ListVal <$> (mapM eval es)
@@ -82,24 +81,16 @@ eval (CallExpr calleeExpr argsExpr) = do
     case calleeVal of
         (LambdaVal bodyExpr parameters closure) -> do
             argsVal <- mapM eval argsExpr
-            let newEnvi = Environment.extend closure (zip parameters argsVal)
-            local (\_ -> newEnvi) (eval bodyExpr)
+            let lambdaEnvi = extend (zip parameters argsVal) closure
+            local (\_ -> lambdaEnvi) (eval bodyExpr)
         _ -> throwError ("can only call lambdas")
 eval (ListComprehensionExpr outputExpr elementName sourceExpr gaurdExpr) = do
-    envi <- ask
     sourceVal <- eval sourceExpr
     case sourceVal of
         (ListVal values) -> do
-            let environments = map (\x -> Environment.extend envi [(elementName, x)]) values
-            mappedValues <- mapM (\e -> local (\_->e) (eval outputExpr)) environments
-            gaurdValues  <- mapM (\e -> local (\_->e) (eval gaurdExpr))  environments
-            bitmask      <- mapM (\v -> case v of
-                BoolVal b -> return b
-                _         -> throwError "gaurd must eval to boolean") gaurdValues
-            let filteredValues = [v | (True, v) <- zip bitmask mappedValues]
-            return (ListVal filteredValues)
-        _ ->
-            throwError ("List comprehension source must evaluate to a list")
+            vs <- evalListComprehension outputExpr elementName gaurdExpr values
+            return (ListVal vs)
+        _ -> throwError ("List comprehension source must evaluate to a list")
 eval (SubscriptExpr sourceExpr indexExpr) = do
     sourceVal <- eval sourceExpr
     case sourceVal of
@@ -114,10 +105,21 @@ eval (SubscriptExpr sourceExpr indexExpr) = do
                 _ -> throwError ("index must be a number")
         _ -> throwError ("can only subscript a list")
 
-checkBoolOpperands :: Val -> Val -> ReaderT (Environment Val) (Either String) (Bool, Bool)
+evalListComprehension :: Expr -> String -> Expr -> [Val] -> Eval [Val]
+evalListComprehension _ _ _ [] = return []
+evalListComprehension outputExpr elementName gaurdExpr (v:vs) = do
+    b <- local (extend [(elementName, v)]) (eval gaurdExpr)
+    case b of
+        BoolVal (True) -> do
+            v'  <- local (extend [(elementName, v)]) (eval outputExpr)
+            vs' <- evalListComprehension outputExpr elementName gaurdExpr vs
+            return (v':vs')
+        _ -> evalListComprehension outputExpr elementName gaurdExpr vs
+
+checkBoolOpperands :: Val -> Val -> Eval (Bool, Bool)
 checkBoolOpperands (BoolVal b1) (BoolVal b2) = return (b1, b2)
 checkBoolOpperands _ _ = throwError ("Opperands must both be booleans")
 
-checkNumberOpperands :: Val -> Val -> ReaderT (Environment Val) (Either String) (Float, Float)
+checkNumberOpperands :: Val -> Val -> Eval (Float, Float)
 checkNumberOpperands (NumberVal n1) (NumberVal n2) = return (n1, n2)
 checkNumberOpperands _ _ = throwError ("Opperands must both be numbers")
