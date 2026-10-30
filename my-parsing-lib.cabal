@@ -68,7 +68,7 @@ executable my-parsing-lib
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.18.3.0 , containers ^>=0.6.7
+    build-depends:    base ^>=4.18.3.0 , containers ^>=0.6.7, mtl
 
     -- Directories containing source files.
     hs-source-dirs:   app
