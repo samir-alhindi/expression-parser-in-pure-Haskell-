@@ -66,6 +66,9 @@ eval (TernaryExpr condition thenBranch elseBranch) = do
     case conditionVal of
         (BoolVal b) -> if b then eval thenBranch else eval elseBranch
         _ -> throwError "ternary condition must be a boolean"
+eval (LetExpr varName varExpr bodyExpr) = do
+    varValue <- eval varExpr
+    local (extend [(varName, varValue)]) (eval bodyExpr)
 eval (RangeExpr startExpr endExpr) = do
     startVal <- eval startExpr
     endVal   <- eval endExpr

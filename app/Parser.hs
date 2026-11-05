@@ -236,6 +236,16 @@ ternary = do
     elseBranch <- expression
     return (TernaryExpr condition thenBranch elseBranch)
 
+let' :: Parser Expr
+let' = do
+    keyword "let"
+    varName <- name
+    consume '='
+    varValue <- expression
+    keyword "in"
+    body <- expression
+    return (LetExpr varName varValue body)
+
 lambda :: Parser Expr
 lambda = do
     consume '\\'
@@ -269,6 +279,7 @@ atom = number
     <|> list
     <|> string
     <|> ternary
+    <|> let'
     <|> lambda
     <|> name'
     <?> "atomic expression"

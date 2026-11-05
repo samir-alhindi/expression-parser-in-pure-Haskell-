@@ -17,6 +17,7 @@ data Expr =
     | LambdaExpr Expr [String]
     | CallExpr Expr [Expr]
     | SubscriptExpr Expr Expr
+    | LetExpr String Expr Expr
 
 data BinaryOp = Plus
     | Minus | Multiply | Divide | Mod
@@ -62,3 +63,5 @@ instance Show Expr where
     show (CallExpr callee args) = (show callee) ++ "(" ++ (intercalate ", " (map show args)) ++ ")"
     show (LambdaExpr _ parameters) = "lambda" ++ "(" ++ (intercalate ", " parameters) ++ ")"
     show (ListComprehensionExpr _ _ _ _) = "ListComprehensionExpr"
+    show (SubscriptExpr es i) = (show es) ++ "[" ++ (show i) ++ "]"
+    show (LetExpr varName varExpr bodyExpr) = "let " ++ varName ++ " = " ++ (show varExpr) ++ " in " ++ (show bodyExpr)
