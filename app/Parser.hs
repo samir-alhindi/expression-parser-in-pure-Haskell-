@@ -183,7 +183,7 @@ and' :: Parser Expr
 and' = binary [And] relational
 
 relational :: Parser Expr
-relational = binary [LessThan, GreaterThan, LessThanOrEqual, GreaterThanOrEqual, IsEqual, NotEqual] arithmatic
+relational = binary [LessThanOrEqual, GreaterThanOrEqual, LessThan, GreaterThan, IsEqual, NotEqual] arithmatic
 
 arithmatic :: Parser Expr
 arithmatic = binary [Plus, Minus] term
